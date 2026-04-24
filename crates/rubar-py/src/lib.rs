@@ -33,7 +33,7 @@ impl<T> IntoPyResult<T> for rubar_core::Result<T> {
 // Geometry wrappers
 // ============================================================================
 
-#[pyclass(frozen, name = "Bar")]
+#[pyclass(frozen, skip_from_py_object, name = "Bar")]
 #[derive(Debug, Clone, Copy)]
 pub struct PyBar(Bar);
 
@@ -52,7 +52,7 @@ impl PyBar {
     }
 }
 
-#[pyclass(frozen, name = "LinearGeometry")]
+#[pyclass(frozen, skip_from_py_object, name = "LinearGeometry")]
 #[derive(Debug, Clone)]
 pub struct PyLinearGeometry(LinearGeometry);
 
@@ -75,7 +75,7 @@ impl PyLinearGeometry {
     }
 }
 
-#[pyclass(frozen, name = "MatrixGeometry")]
+#[pyclass(frozen, skip_from_py_object, name = "MatrixGeometry")]
 #[derive(Debug, Clone)]
 pub struct PyMatrixGeometry(MatrixGeometry);
 
@@ -98,7 +98,7 @@ impl PyMatrixGeometry {
 // Code 128 symbol markers (Python-visible)
 // ============================================================================
 
-#[pyclass(frozen)]
+#[pyclass(frozen, from_py_object)]
 #[derive(Debug, Clone)]
 pub struct Data {
     #[pyo3(get)]
@@ -118,7 +118,7 @@ impl Data {
 
 macro_rules! marker_symbol {
     ($name:ident) => {
-        #[pyclass(frozen)]
+        #[pyclass(frozen, skip_from_py_object)]
         #[derive(Debug, Clone)]
         pub struct $name;
 
@@ -194,14 +194,14 @@ fn linear_render_png<'py>(
     let unit = Unit::from_str(unit).into_py_result()?;
     let data =
         render_linear_png(geom, width, height, unit, dpi, quiet_zone_modules).into_py_result()?;
-    Ok(PyBytes::new_bound(py, &data))
+    Ok(PyBytes::new(py, &data))
 }
 
 // ============================================================================
 // Linear barcode classes
 // ============================================================================
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct Code128 {
     geometry: LinearGeometry,
 }
@@ -238,7 +238,7 @@ impl Code128 {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct Code39 {
     geometry: LinearGeometry,
 }
@@ -274,7 +274,7 @@ impl Code39 {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct UpcA {
     geometry: LinearGeometry,
 }
@@ -310,7 +310,7 @@ impl UpcA {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct Ean8 {
     geometry: LinearGeometry,
 }
@@ -346,7 +346,7 @@ impl Ean8 {
     }
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct Itf {
     geometry: LinearGeometry,
 }
@@ -386,7 +386,7 @@ impl Itf {
 // QR Code
 // ============================================================================
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
 pub struct QrCode {
     geometry: MatrixGeometry,
 }
@@ -422,7 +422,7 @@ impl QrCode {
         let data =
             render_matrix_png(&self.geometry, width, height, unit, dpi, quiet_zone_modules)
                 .into_py_result()?;
-        Ok(PyBytes::new_bound(py, &data))
+        Ok(PyBytes::new(py, &data))
     }
 }
 
@@ -456,7 +456,7 @@ fn _rubar(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StartC>()?;
 
     // Error type
-    m.add("RubarError", py.get_type_bound::<PyRubarError>())?;
+    m.add("RubarError", py.get_type::<PyRubarError>())?;
 
     Ok(())
 }
