@@ -1,0 +1,13 @@
+[package]
+name = "rubar-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Barcode encoding and rendering — pure Rust core (no Python bindings)"
+
+[dependencies]
+thiserror.workspace = true
+barcoders.workspace = true
+qrcode.workspace = true
+tiny-skia.workspace = true

@@ -1,17 +1,17 @@
-[package]
-name = "rubar"
+[workspace]
+members = ["crates/rubar-core", "crates/rubar-py"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/stringking/rubar"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-pyo3 = { version = "0.22", features = ["extension-module"] }
+[workspace.dependencies]
+rubar-core = { path = "crates/rubar-core", version = "0.1.0" }
 thiserror = "1.0"
 barcoders = "2.0.0"
 qrcode = "0.14.1"
 tiny-skia = "0.11"
-
-[dev-dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }

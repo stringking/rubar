@@ -130,7 +130,7 @@ png = barcode.render_png(400, 100, unit="px", quiet_zone_modules=10)
 
 ## Integration with rupdf
 
-rubar is the barcode engine for [rupdf](https://github.com/anthropics/rupdf), a PDF generation library. While designed for that integration, rubar is fully usable as a standalone library for any barcode generation needs.
+rubar is the barcode engine for [rupdf](https://github.com/stringking/rupdf), a PDF generation library. While designed for that integration, rubar is fully usable as a standalone library for any barcode generation needs.
 
 ## Supported Symbologies
 

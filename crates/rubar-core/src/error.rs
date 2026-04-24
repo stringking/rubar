@@ -1,5 +1,3 @@
-use pyo3::exceptions::PyException;
-use pyo3::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -31,14 +29,9 @@ pub enum RubarError {
 
     #[error("Rendering error: {0}")]
     RenderingError(String),
-}
 
-pyo3::create_exception!(rubar, PyRubarError, PyException);
-
-impl From<RubarError> for PyErr {
-    fn from(err: RubarError) -> PyErr {
-        PyRubarError::new_err(err.to_string())
-    }
+    #[error("Invalid GS1-128 value: {0}")]
+    InvalidGs1(String),
 }
 
 pub type Result<T> = std::result::Result<T, RubarError>;

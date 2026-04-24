@@ -1,0 +1,15 @@
+[package]
+name = "rubar-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Python bindings for rubar"
+
+[lib]
+name = "_rubar"
+crate-type = ["cdylib"]
+
+[dependencies]
+rubar-core.workspace = true
+pyo3.workspace = true
