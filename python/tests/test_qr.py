@@ -5,22 +5,23 @@ from rubar import QrCode, RubarError
 def test_qr_basic():
     qr = QrCode("HELLO")
     geom = qr.geometry()
-    assert geom.size >= 21  # Minimum QR is 21x21 (version 1)
-    assert len(geom.modules) == geom.size
-    assert len(geom.modules[0]) == geom.size
+    assert geom.width >= 21  # Minimum QR is 21x21 (version 1)
+    assert geom.is_square()
+    assert len(geom.modules) == geom.height
+    assert len(geom.modules[0]) == geom.width
 
 
 def test_qr_url():
     qr = QrCode("https://example.com")
     geom = qr.geometry()
-    assert geom.size >= 21
+    assert geom.width >= 21
 
 
 def test_qr_long_data():
     qr = QrCode("A" * 100)
     geom = qr.geometry()
     # Longer data requires larger QR code
-    assert geom.size > 21
+    assert geom.width > 21
 
 
 def test_qr_svg():

@@ -103,6 +103,27 @@ pub fn to_symbols(fields: &[AiField]) -> Vec<Code128Symbol> {
     out
 }
 
+/// Build the byte payload for a GS1 Data Matrix.
+///
+/// Concatenates each AI+data, inserting an ASCII Group Separator (`\x1D`)
+/// between variable-length fields. The datamatrix crate's `encode_gs1` adds
+/// the FNC1 designator codeword itself; callers should pass the return
+/// value of this function straight into `encode_datamatrix(..., gs1=true)`.
+pub fn to_datamatrix_bytes(fields: &[AiField]) -> Vec<u8> {
+    const GS: u8 = 0x1D;
+    let mut out = Vec::new();
+    for (i, field) in fields.iter().enumerate() {
+        out.extend_from_slice(field.ai.as_bytes());
+        out.extend_from_slice(field.data.as_bytes());
+        let is_last = i + 1 == fields.len();
+        let is_variable = fixed_ai_length(&field.ai).is_none();
+        if !is_last && is_variable {
+            out.push(GS);
+        }
+    }
+    out
+}
+
 /// Canonical parenthesized human-readable representation of parsed fields.
 pub fn format_human_readable(fields: &[AiField]) -> String {
     let mut out = String::new();
@@ -228,6 +249,32 @@ mod tests {
         // Last symbol must not be an FNC1 (terminator) — the variable-length
         // 10BATCH is the last field, so no separator.
         assert_ne!(symbols.last(), Some(&Code128Symbol::FNC1));
+    }
+
+    #[test]
+    fn datamatrix_bytes_no_separator_after_fixed() {
+        // Both AIs are fixed-length, so no \x1D should appear between them.
+        let fields = parse("(01)12345678901234(17)260101").unwrap();
+        let bytes = to_datamatrix_bytes(&fields);
+        assert_eq!(bytes, b"011234567890123417260101");
+    }
+
+    #[test]
+    fn datamatrix_bytes_separator_after_variable() {
+        let fields = parse("(10)BATCH(01)12345678901234").unwrap();
+        let bytes = to_datamatrix_bytes(&fields);
+        // 10BATCH <GS> 0112345678901234
+        assert_eq!(bytes[..7], *b"10BATCH");
+        assert_eq!(bytes[7], 0x1D);
+        assert_eq!(&bytes[8..], b"0112345678901234");
+    }
+
+    #[test]
+    fn datamatrix_bytes_no_trailing_separator() {
+        // Last field is variable-length — no trailing GS
+        let fields = parse("(01)12345678901234(10)BATCH").unwrap();
+        let bytes = to_datamatrix_bytes(&fields);
+        assert_ne!(*bytes.last().unwrap(), 0x1D);
     }
 
     #[test]

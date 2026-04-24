@@ -2,12 +2,12 @@
 
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyType};
 
 use rubar_core::{
-    encode_code128, encode_code39, encode_ean8, encode_itf, encode_qr, encode_upc_a,
-    render_linear_png, render_linear_svg, render_matrix_png, render_matrix_svg,
-    Bar, Code128Symbol, LinearGeometry, MatrixGeometry, RubarError, Unit,
+    encode_code128, encode_code39, encode_datamatrix, encode_ean8, encode_itf, encode_qr,
+    encode_upc_a, gs1 as core_gs1, render_linear_png, render_linear_svg, render_matrix_png,
+    render_matrix_svg, Bar, Code128Symbol, LinearGeometry, MatrixGeometry, RubarError, Unit,
 };
 
 // ============================================================================
@@ -86,11 +86,21 @@ impl PyMatrixGeometry {
         self.0.modules.clone()
     }
     #[getter]
-    fn size(&self) -> u32 {
-        self.0.size
+    fn width(&self) -> u32 {
+        self.0.width
+    }
+    #[getter]
+    fn height(&self) -> u32 {
+        self.0.height
+    }
+    fn is_square(&self) -> bool {
+        self.0.is_square()
     }
     fn __repr__(&self) -> String {
-        format!("MatrixGeometry(size={})", self.0.size)
+        format!(
+            "MatrixGeometry(width={}, height={})",
+            self.0.width, self.0.height
+        )
     }
 }
 
@@ -427,6 +437,81 @@ impl QrCode {
 }
 
 // ============================================================================
+// Data Matrix
+// ============================================================================
+
+#[pyclass(frozen, skip_from_py_object)]
+pub struct DataMatrix {
+    geometry: MatrixGeometry,
+}
+
+#[pymethods]
+impl DataMatrix {
+    /// Encode a plain Data Matrix (ECC 200).
+    ///
+    /// Accepts either a string (UTF-8 bytes) or a `bytes` object. Per the
+    /// Data Matrix spec, prefer printable ASCII for broadest scanner support.
+    #[new]
+    fn new(data: Bound<'_, PyAny>) -> PyResult<Self> {
+        let bytes = extract_bytes_or_str(&data)?;
+        let geometry = encode_datamatrix(&bytes, false).into_py_result()?;
+        Ok(DataMatrix { geometry })
+    }
+
+    /// Encode a GS1 Data Matrix from the canonical parenthesized AI form,
+    /// e.g. `(01)12345678901234(10)BATCH123`.
+    ///
+    /// Fixed-length AIs are validated; variable-length AIs get a `\x1D`
+    /// (GS) separator before the next field automatically, and the FNC1
+    /// designator codeword is inserted at the start of the symbol.
+    #[classmethod]
+    fn gs1(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Self> {
+        let fields = core_gs1::parse(value).into_py_result()?;
+        let payload = core_gs1::to_datamatrix_bytes(&fields);
+        let geometry = encode_datamatrix(&payload, true).into_py_result()?;
+        Ok(DataMatrix { geometry })
+    }
+
+    fn geometry(&self) -> PyMatrixGeometry {
+        PyMatrixGeometry(self.geometry.clone())
+    }
+
+    #[pyo3(signature = (*, quiet_zone_modules = 0))]
+    fn render_svg(&self, quiet_zone_modules: u32) -> String {
+        render_matrix_svg(&self.geometry, quiet_zone_modules)
+    }
+
+    #[pyo3(signature = (width, height, *, unit = "in", dpi = None, quiet_zone_modules = 0))]
+    fn render_png<'py>(
+        &self,
+        py: Python<'py>,
+        width: f64,
+        height: f64,
+        unit: &str,
+        dpi: Option<u32>,
+        quiet_zone_modules: u32,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let unit = Unit::from_str(unit).into_py_result()?;
+        let data =
+            render_matrix_png(&self.geometry, width, height, unit, dpi, quiet_zone_modules)
+                .into_py_result()?;
+        Ok(PyBytes::new(py, &data))
+    }
+}
+
+fn extract_bytes_or_str(data: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
+    if let Ok(s) = data.extract::<&str>() {
+        return Ok(s.as_bytes().to_vec());
+    }
+    if let Ok(b) = data.cast::<PyBytes>() {
+        return Ok(b.as_bytes().to_vec());
+    }
+    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+        "expected str or bytes",
+    ))
+}
+
+// ============================================================================
 // PyO3 Module
 // ============================================================================
 
@@ -439,6 +524,7 @@ fn _rubar(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Ean8>()?;
     m.add_class::<Itf>()?;
     m.add_class::<QrCode>()?;
+    m.add_class::<DataMatrix>()?;
 
     // Geometry classes
     m.add_class::<PyLinearGeometry>()?;

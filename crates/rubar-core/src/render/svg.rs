@@ -24,17 +24,18 @@ pub fn render_linear_svg(geom: &LinearGeometry, quiet_zone_modules: u32) -> Stri
 
 /// Render matrix barcode to SVG (viewBox only, no width/height)
 pub fn render_matrix_svg(geom: &MatrixGeometry, quiet_zone_modules: u32) -> String {
-    let total_size = geom.size + 2 * quiet_zone_modules;
+    let total_w = geom.width + 2 * quiet_zone_modules;
+    let total_h = geom.height + 2 * quiet_zone_modules;
 
     let mut svg = format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {} {}">"#,
-        total_size, total_size
+        total_w, total_h
     );
 
     // White background
     svg.push_str(&format!(
         r#"<rect x="0" y="0" width="{}" height="{}" fill="white"/>"#,
-        total_size, total_size
+        total_w, total_h
     ));
 
     for (y, row) in geom.modules.iter().enumerate() {
@@ -94,7 +95,8 @@ mod tests {
                 vec![true, false],
                 vec![false, true],
             ],
-            size: 2,
+            width: 2,
+            height: 2,
         };
 
         let svg = render_matrix_svg(&geom, 0);
@@ -107,11 +109,25 @@ mod tests {
     fn test_matrix_svg_with_quiet_zone() {
         let geom = MatrixGeometry {
             modules: vec![vec![true]],
-            size: 1,
+            width: 1,
+            height: 1,
         };
 
         let svg = render_matrix_svg(&geom, 4);
         assert!(svg.contains("viewBox=\"0 0 9 9\"")); // 1 + 2*4
         assert!(svg.contains(r#"<rect x="4" y="4" width="1" height="1"/>"#)); // offset by 4
+    }
+
+    #[test]
+    fn test_matrix_svg_rectangular() {
+        // Data Matrix can be rectangular (e.g. 8x18)
+        let geom = MatrixGeometry {
+            modules: vec![vec![true, false, true, false]; 2],
+            width: 4,
+            height: 2,
+        };
+
+        let svg = render_matrix_svg(&geom, 0);
+        assert!(svg.contains("viewBox=\"0 0 4 2\""));
     }
 }

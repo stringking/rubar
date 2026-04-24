@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 class Bar:
     @property
@@ -16,7 +16,10 @@ class MatrixGeometry:
     @property
     def modules(self) -> List[List[bool]]: ...
     @property
-    def size(self) -> int: ...
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int: ...
+    def is_square(self) -> bool: ...
 
 class Data:
     def __init__(self, value: str) -> None: ...
@@ -116,6 +119,26 @@ class Itf:
 
 class QrCode:
     def __init__(self, data: str) -> None: ...
+    def geometry(self) -> MatrixGeometry: ...
+    def render_svg(self, *, quiet_zone_modules: int = 0) -> str: ...
+    def render_png(
+        self,
+        width: float,
+        height: float,
+        *,
+        unit: str = "in",
+        dpi: Optional[int] = None,
+        quiet_zone_modules: int = 0,
+    ) -> bytes: ...
+
+class DataMatrix:
+    """Data Matrix (ECC 200) barcode."""
+
+    def __init__(self, data: Union[str, bytes]) -> None: ...
+    @classmethod
+    def gs1(cls, value: str) -> "DataMatrix":
+        """Encode a GS1 Data Matrix from the parenthesized AI form,
+        e.g. ``(01)12345678901234(10)BATCH123``."""
     def geometry(self) -> MatrixGeometry: ...
     def render_svg(self, *, quiet_zone_modules: int = 0) -> str: ...
     def render_png(

@@ -11,3 +11,4 @@ thiserror.workspace = true
 barcoders.workspace = true
 qrcode.workspace = true
 tiny-skia.workspace = true
+datamatrix.workspace = true

@@ -68,9 +68,10 @@ pub fn render_matrix_png(
     // Fill with white
     pixmap.fill(Color::WHITE);
 
-    let total_size = geom.size + 2 * quiet_zone_modules;
-    let module_size_x = pixel_width as f32 / total_size as f32;
-    let module_size_y = pixel_height as f32 / total_size as f32;
+    let total_w = geom.width + 2 * quiet_zone_modules;
+    let total_h = geom.height + 2 * quiet_zone_modules;
+    let module_size_x = pixel_width as f32 / total_w as f32;
+    let module_size_y = pixel_height as f32 / total_h as f32;
 
     let mut paint = tiny_skia::Paint::default();
     paint.set_color(Color::BLACK);
@@ -166,7 +167,8 @@ mod tests {
     fn test_matrix_png_pixels() {
         let geom = MatrixGeometry {
             modules: vec![vec![true, false], vec![false, true]],
-            size: 2,
+            width: 2,
+            height: 2,
         };
 
         let png = render_matrix_png(&geom, 100.0, 100.0, Unit::Pixels, None, 0).unwrap();

@@ -6,6 +6,7 @@ from rubar._rubar import (
     Ean8,
     Itf,
     QrCode,
+    DataMatrix,
     # Geometry classes
     LinearGeometry,
     MatrixGeometry,
@@ -30,6 +31,7 @@ __all__ = [
     "Ean8",
     "Itf",
     "QrCode",
+    "DataMatrix",
     "LinearGeometry",
     "MatrixGeometry",
     "Bar",

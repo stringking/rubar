@@ -21,7 +21,8 @@ pub fn encode_qr(data: &str) -> Result<MatrixGeometry> {
 
     Ok(MatrixGeometry {
         modules,
-        size: width as u32,
+        width: width as u32,
+        height: width as u32,
     })
 }
 
@@ -32,15 +33,16 @@ mod tests {
     #[test]
     fn test_qr_basic() {
         let geom = encode_qr("HELLO").unwrap();
-        assert!(geom.size >= 21); // Minimum QR is 21x21 (version 1)
-        assert_eq!(geom.modules.len(), geom.size as usize);
-        assert_eq!(geom.modules[0].len(), geom.size as usize);
+        assert!(geom.width >= 21); // Minimum QR is 21x21 (version 1)
+        assert!(geom.is_square());
+        assert_eq!(geom.modules.len(), geom.height as usize);
+        assert_eq!(geom.modules[0].len(), geom.width as usize);
     }
 
     #[test]
     fn test_qr_url() {
         let geom = encode_qr("https://example.com").unwrap();
-        assert!(geom.size >= 21);
+        assert!(geom.width >= 21);
     }
 
     #[test]
@@ -48,7 +50,7 @@ mod tests {
         let data = "A".repeat(100);
         let geom = encode_qr(&data).unwrap();
         // Longer data requires larger QR code
-        assert!(geom.size > 21);
+        assert!(geom.width > 21);
     }
 
     #[test]
