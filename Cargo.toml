@@ -3,13 +3,13 @@ members = ["crates/rubar-core", "crates/rubar-py"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/stringking/rubar"
 
 [workspace.dependencies]
-rubar-core = { path = "crates/rubar-core", version = "0.1.0" }
+rubar-core = { path = "crates/rubar-core", version = "0.2.0" }
 thiserror = "1.0"
 barcoders = "2.0.0"
 qrcode = "0.14.1"

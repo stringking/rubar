@@ -7,7 +7,8 @@ use pyo3::types::{PyBytes, PyType};
 use rubar_core::{
     encode_code128, encode_code39, encode_datamatrix, encode_ean8, encode_itf, encode_qr,
     encode_upc_a, gs1 as core_gs1, render_linear_png, render_linear_svg, render_matrix_png,
-    render_matrix_svg, Bar, Code128Symbol, LinearGeometry, MatrixGeometry, RubarError, Unit,
+    render_matrix_svg, Bar, Code128Symbol, DataMatrixShape, LinearGeometry, MatrixGeometry,
+    RubarError, Unit,
 };
 
 // ============================================================================
@@ -445,16 +446,33 @@ pub struct DataMatrix {
     geometry: MatrixGeometry,
 }
 
+fn shape_from_str(s: &str) -> PyResult<DataMatrixShape> {
+    match s {
+        "any" => Ok(DataMatrixShape::Any),
+        "square" => Ok(DataMatrixShape::Square),
+        "rectangular" | "rectangle" | "rect" => Ok(DataMatrixShape::Rectangular),
+        _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "invalid shape '{}': expected 'any', 'square', or 'rectangular'",
+            s
+        ))),
+    }
+}
+
 #[pymethods]
 impl DataMatrix {
     /// Encode a plain Data Matrix (ECC 200).
     ///
     /// Accepts either a string (UTF-8 bytes) or a `bytes` object. Per the
     /// Data Matrix spec, prefer printable ASCII for broadest scanner support.
+    ///
+    /// `shape` is one of 'any' (default — encoder picks the smallest-area
+    /// symbol), 'square', or 'rectangular'.
     #[new]
-    fn new(data: Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(signature = (data, *, shape = "any"))]
+    fn new(data: Bound<'_, PyAny>, shape: &str) -> PyResult<Self> {
         let bytes = extract_bytes_or_str(&data)?;
-        let geometry = encode_datamatrix(&bytes, false).into_py_result()?;
+        let shape = shape_from_str(shape)?;
+        let geometry = encode_datamatrix(&bytes, false, shape).into_py_result()?;
         Ok(DataMatrix { geometry })
     }
 
@@ -464,11 +482,16 @@ impl DataMatrix {
     /// Fixed-length AIs are validated; variable-length AIs get a `\x1D`
     /// (GS) separator before the next field automatically, and the FNC1
     /// designator codeword is inserted at the start of the symbol.
+    ///
+    /// Per GS1 General Specifications both square and rectangular GS1 Data
+    /// Matrix are valid; `shape` selects which one to emit.
     #[classmethod]
-    fn gs1(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Self> {
+    #[pyo3(signature = (value, *, shape = "any"))]
+    fn gs1(_cls: &Bound<'_, PyType>, value: &str, shape: &str) -> PyResult<Self> {
         let fields = core_gs1::parse(value).into_py_result()?;
         let payload = core_gs1::to_datamatrix_bytes(&fields);
-        let geometry = encode_datamatrix(&payload, true).into_py_result()?;
+        let shape = shape_from_str(shape)?;
+        let geometry = encode_datamatrix(&payload, true, shape).into_py_result()?;
         Ok(DataMatrix { geometry })
     }
 

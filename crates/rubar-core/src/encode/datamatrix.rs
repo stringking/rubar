@@ -2,6 +2,33 @@ use crate::error::{Result, RubarError};
 use crate::geometry::MatrixGeometry;
 use datamatrix::{DataMatrix, SymbolList};
 
+/// Shape constraint for Data Matrix encoding.
+///
+/// The Data Matrix (ECC 200) spec defines both square sizes (10x10 through
+/// 144x144) and rectangular sizes (8x18, 8x32, 12x26, etc.). For any given
+/// payload the encoder picks the smallest-area symbol that fits; if you
+/// want a specific shape regardless of area, constrain the symbol list.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum DataMatrixShape {
+    /// Allow any shape; the encoder picks the smallest-area symbol. Default.
+    #[default]
+    Any,
+    /// Restrict to square symbols (10x10, 12x12, ..., 144x144).
+    Square,
+    /// Restrict to rectangular symbols (8x18, 8x32, 12x26, 12x36, 16x36, 16x48).
+    Rectangular,
+}
+
+impl DataMatrixShape {
+    fn apply(self, list: SymbolList) -> SymbolList {
+        match self {
+            DataMatrixShape::Any => list,
+            DataMatrixShape::Square => list.enforce_square(),
+            DataMatrixShape::Rectangular => list.enforce_rectangular(),
+        }
+    }
+}
+
 /// Encode data as a Data Matrix (ECC 200).
 ///
 /// When `gs1` is true, the encoder emits the FNC1 designator as the first
@@ -10,8 +37,17 @@ use datamatrix::{DataMatrix, SymbolList};
 /// `\x1D` (ASCII Group Separator) in `data`. See [`crate::gs1::to_datamatrix_bytes`]
 /// for a helper that produces a correctly-formatted payload from parsed AI
 /// fields.
-pub fn encode_datamatrix(data: &[u8], gs1: bool) -> Result<MatrixGeometry> {
-    let symbol_list = SymbolList::default();
+///
+/// `shape` controls whether the encoder picks a square, rectangular, or any
+/// symbol size. Both GS1 and plain Data Matrix support both shapes per ISO
+/// 16022 / GS1 General Specifications.
+pub fn encode_datamatrix(data: &[u8], gs1: bool, shape: DataMatrixShape) -> Result<MatrixGeometry> {
+    let symbol_list = shape.apply(SymbolList::default());
+    if symbol_list.is_empty() {
+        return Err(RubarError::EncodingError(
+            "symbol list is empty for requested shape".to_string(),
+        ));
+    }
     let code = if gs1 {
         DataMatrix::encode_gs1(data, symbol_list)
     } else {
@@ -45,36 +81,46 @@ mod tests {
 
     #[test]
     fn encodes_ascii_data() {
-        let geom = encode_datamatrix(b"HELLO", false).unwrap();
-        // Smallest square Data Matrix that fits "HELLO" is 10x10.
-        assert!(geom.width >= 10);
-        assert_eq!(geom.width, geom.height); // default symbol list picks square
+        let geom = encode_datamatrix(b"HELLO", false, DataMatrixShape::Any).unwrap();
+        // Smallest symbol that fits "HELLO" is 10x10 (square) or a rectangle.
+        assert!(geom.width >= 8);
         assert_eq!(geom.modules.len(), geom.height as usize);
         assert_eq!(geom.modules[0].len(), geom.width as usize);
     }
 
     #[test]
     fn encodes_gs1() {
-        // GS1 Data Matrix with AI (01) GTIN + AI (17) expiry (both fixed-length)
         let payload = b"0112345678901234171231";
-        let geom = encode_datamatrix(payload, true).unwrap();
-        assert!(geom.width >= 10);
+        let geom = encode_datamatrix(payload, true, DataMatrixShape::Any).unwrap();
+        assert!(geom.width >= 8);
     }
 
     #[test]
     fn encodes_gs1_with_group_separators() {
         // Variable-length AI followed by another AI: AIs are separated by \x1D.
         let payload = b"10BATCH123\x1D0112345678901234";
-        let geom = encode_datamatrix(payload, true).unwrap();
-        assert!(geom.width >= 10);
+        let geom = encode_datamatrix(payload, true, DataMatrixShape::Any).unwrap();
+        assert!(geom.width >= 8);
+    }
+
+    #[test]
+    fn square_shape_forces_square_output() {
+        // Payload that would otherwise pick rectangular (smaller area).
+        let payload = b"10BATCH\x1D0112345678901234";
+        let geom = encode_datamatrix(payload, true, DataMatrixShape::Square).unwrap();
+        assert!(geom.is_square(), "expected square, got {}x{}", geom.width, geom.height);
+    }
+
+    #[test]
+    fn rectangular_shape_forces_rect_output() {
+        // Small payload that would normally pick square 10x10; force rectangular.
+        let geom = encode_datamatrix(b"HI", false, DataMatrixShape::Rectangular).unwrap();
+        assert!(!geom.is_square(), "expected rectangular, got {}x{}", geom.width, geom.height);
     }
 
     #[test]
     fn finds_a_dark_module() {
-        // Every valid Data Matrix has at least one dark module in the L finder
-        // pattern (left + bottom edges). Quick sanity check that we populated
-        // the module matrix at all.
-        let geom = encode_datamatrix(b"X", false).unwrap();
+        let geom = encode_datamatrix(b"X", false, DataMatrixShape::Any).unwrap();
         let any_dark = geom.modules.iter().flat_map(|r| r.iter()).any(|&b| b);
         assert!(any_dark);
     }

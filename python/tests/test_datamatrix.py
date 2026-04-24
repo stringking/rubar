@@ -69,3 +69,30 @@ def test_datamatrix_png_inches():
     dm = DataMatrix("TEST")
     png = dm.render_png(1.0, 1.0, unit="in", dpi=300)
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_datamatrix_shape_square():
+    # Payload that would otherwise pick rectangular — force square
+    dm = DataMatrix.gs1("(10)BATCH(01)12345678901234", shape="square")
+    geom = dm.geometry()
+    assert geom.is_square()
+
+
+def test_datamatrix_shape_rectangular():
+    # Small payload that normally picks square — force rectangular
+    dm = DataMatrix("HI", shape="rectangular")
+    geom = dm.geometry()
+    assert not geom.is_square()
+
+
+def test_datamatrix_shape_any_default():
+    # Default shape allows the encoder to pick optimally
+    dm = DataMatrix.gs1("(10)BATCH(01)12345678901234")
+    geom = dm.geometry()
+    # No assertion on shape — just that it encodes successfully
+    assert geom.width >= 8
+
+
+def test_datamatrix_invalid_shape():
+    with pytest.raises(ValueError):
+        DataMatrix("HELLO", shape="triangular")

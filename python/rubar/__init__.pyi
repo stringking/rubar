@@ -132,11 +132,16 @@ class QrCode:
     ) -> bytes: ...
 
 class DataMatrix:
-    """Data Matrix (ECC 200) barcode."""
+    """Data Matrix (ECC 200) barcode.
 
-    def __init__(self, data: Union[str, bytes]) -> None: ...
+    ``shape`` is one of ``'any'`` (default; encoder picks the smallest-area
+    symbol), ``'square'``, or ``'rectangular'``. Both shapes are valid for
+    plain and GS1 Data Matrix per ISO 16022 / GS1 General Specifications.
+    """
+
+    def __init__(self, data: Union[str, bytes], *, shape: str = "any") -> None: ...
     @classmethod
-    def gs1(cls, value: str) -> "DataMatrix":
+    def gs1(cls, value: str, *, shape: str = "any") -> "DataMatrix":
         """Encode a GS1 Data Matrix from the parenthesized AI form,
         e.g. ``(01)12345678901234(10)BATCH123``."""
     def geometry(self) -> MatrixGeometry: ...
