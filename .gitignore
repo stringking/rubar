@@ -20,5 +20,9 @@ build/
 # Examples output
 /examples/output/
 
+# Secrets
+.env
+.env.*
+
 # OS
 .DS_Store
