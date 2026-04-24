@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Barcode encoding and rendering — pure Rust core (no Python bindings)"
+readme = "README.md"
 
 [dependencies]
 thiserror.workspace = true
