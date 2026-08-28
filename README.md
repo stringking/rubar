@@ -47,16 +47,19 @@ svg = barcode.render_svg()
 png = barcode.render_png(400, 100, unit="px")
 ```
 
+Code sets are chosen to minimise the symbol count. Digit runs pack two-per-symbol
+into Code Set C, so `Data("12345678901234")` is 7 symbols rather than 14 — which
+matters because a barcode is normally sized from its symbol count.
+
 ### GS1-128 with FNC1
 
 GS1-128 barcodes require FNC1 immediately after the start symbol. With rubar, this is explicit:
 
 ```python
-from rubar import Code128, Data, FNC1, StartC
+from rubar import Code128, Data, FNC1
 
 # GS1-128: Application Identifier (01) + GTIN-14
 barcode = Code128([
-    StartC(),           # Start in Code Set C (numeric pairs)
     FNC1(),             # FNC1 indicates GS1 format
     Data("01"),         # AI: GTIN
     Data("12345678901234"),
@@ -64,6 +67,13 @@ barcode = Code128([
 
 svg = barcode.render_svg()
 ```
+
+Planning spans the whole symbol list, so a digit run split across several `Data`
+entries still packs as one run.
+
+A `StartA()`, `StartB()` or `StartC()` symbol pins the *initial* code set and
+planning continues from there. It is rarely needed — the planner already picks
+Code Set C for numeric payloads like the one above.
 
 ### QR Code
 

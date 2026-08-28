@@ -2,8 +2,8 @@
 //!
 //! Parses the canonical parenthesized form — `(01)12345678901234(17)260101(10)BATCH123` —
 //! into a list of `(AI, data)` pairs, and builds the corresponding Code 128 symbol
-//! stream (Start-B, FNC1 designator, data, and FNC1 separators after
-//! variable-length fields).
+//! stream (FNC1 designator, data, and FNC1 separators after variable-length
+//! fields).
 
 use crate::error::{Result, RubarError};
 use crate::symbol::Code128Symbol;
@@ -38,7 +38,9 @@ pub fn parse(value: &str) -> Result<Vec<AiField>> {
             ai.push(ch);
         }
         if !closed {
-            return Err(RubarError::InvalidGs1("unterminated AI: missing ')'".to_string()));
+            return Err(RubarError::InvalidGs1(
+                "unterminated AI: missing ')'".to_string(),
+            ));
         }
         if ai.is_empty() || ai.len() > 4 || !ai.chars().all(|c| c.is_ascii_digit()) {
             return Err(RubarError::InvalidGs1(format!(
@@ -83,11 +85,14 @@ pub fn parse(value: &str) -> Result<Vec<AiField>> {
 
 /// Build a Code 128 symbol stream for a GS1-128 barcode.
 ///
-/// Starts with `StartB` + `FNC1` (the GS1-128 designator), emits each AI+data
-/// as a `Data` symbol, and inserts an `FNC1` between variable-length fields.
+/// Starts with the `FNC1` GS1-128 designator, emits each AI+data as a `Data`
+/// symbol, and inserts an `FNC1` between variable-length fields.
+///
+/// Deliberately emits no start symbol: GS1 payloads are mostly digits, so
+/// letting `encode_code128` plan the code sets picks Code C and roughly halves
+/// the symbol count. Pinning Start-B here used to force one symbol per digit.
 pub fn to_symbols(fields: &[AiField]) -> Vec<Code128Symbol> {
-    let mut out = Vec::with_capacity(fields.len() * 2 + 2);
-    out.push(Code128Symbol::StartB);
+    let mut out = Vec::with_capacity(fields.len() * 2 + 1);
     out.push(Code128Symbol::FNC1);
     for (i, field) in fields.iter().enumerate() {
         let mut payload = String::with_capacity(field.ai.len() + field.data.len());
@@ -166,7 +171,13 @@ mod tests {
     #[test]
     fn parses_single_fixed_ai() {
         let fields = parse("(01)12345678901234").unwrap();
-        assert_eq!(fields, vec![AiField { ai: "01".into(), data: "12345678901234".into() }]);
+        assert_eq!(
+            fields,
+            vec![AiField {
+                ai: "01".into(),
+                data: "12345678901234".into()
+            }]
+        );
     }
 
     #[test]
@@ -217,29 +228,59 @@ mod tests {
     fn to_symbols_starts_with_fnc1_designator() {
         let fields = parse("(01)12345678901234").unwrap();
         let symbols = to_symbols(&fields);
-        assert_eq!(symbols[0], Code128Symbol::StartB);
-        assert_eq!(symbols[1], Code128Symbol::FNC1);
+        assert_eq!(symbols[0], Code128Symbol::FNC1);
+    }
+
+    #[test]
+    fn to_symbols_emits_no_start_symbol() {
+        // The start code set is the encoder's to plan — see `to_symbols`.
+        let fields = parse("(01)12345678901234(10)BATCH").unwrap();
+        for symbol in to_symbols(&fields) {
+            assert!(!matches!(
+                symbol,
+                Code128Symbol::StartA | Code128Symbol::StartB | Code128Symbol::StartC
+            ));
+        }
     }
 
     #[test]
     fn to_symbols_no_separator_after_fixed() {
         let fields = parse("(01)12345678901234(17)260101").unwrap();
         let symbols = to_symbols(&fields);
-        // StartB, FNC1, Data("0112345678901234"), Data("17260101")
-        assert_eq!(symbols.len(), 4);
-        assert_eq!(symbols[2], Code128Symbol::Data("0112345678901234".into()));
-        assert_eq!(symbols[3], Code128Symbol::Data("17260101".into()));
+        // FNC1, Data("0112345678901234"), Data("17260101")
+        assert_eq!(symbols.len(), 3);
+        assert_eq!(symbols[1], Code128Symbol::Data("0112345678901234".into()));
+        assert_eq!(symbols[2], Code128Symbol::Data("17260101".into()));
     }
 
     #[test]
     fn to_symbols_separator_after_variable() {
         let fields = parse("(10)BATCH(01)12345678901234").unwrap();
         let symbols = to_symbols(&fields);
-        // StartB, FNC1, Data("10BATCH"), FNC1, Data("0112345678901234")
-        assert_eq!(symbols.len(), 5);
-        assert_eq!(symbols[2], Code128Symbol::Data("10BATCH".into()));
-        assert_eq!(symbols[3], Code128Symbol::FNC1);
-        assert_eq!(symbols[4], Code128Symbol::Data("0112345678901234".into()));
+        // FNC1, Data("10BATCH"), FNC1, Data("0112345678901234")
+        assert_eq!(symbols.len(), 4);
+        assert_eq!(symbols[1], Code128Symbol::Data("10BATCH".into()));
+        assert_eq!(symbols[2], Code128Symbol::FNC1);
+        assert_eq!(symbols[3], Code128Symbol::Data("0112345678901234".into()));
+    }
+
+    #[test]
+    fn gs1_payloads_encode_in_code_c() {
+        // End-to-end over the payloads in sklib's density harness. Expected
+        // module counts are the minimal-encoding counts sklib sizes from; each
+        // was 1.66-1.76x larger while Start-B was pinned here.
+        for (value, modules) in [
+            ("(01)20197344223371", 134),
+            ("(01)20197344223371(21)00000001", 189),
+            // Digit run spans the two Data segments — planning is over the
+            // concatenated stream, not per segment.
+            ("(01)12345678901234(17)260101", 178),
+            ("(10)BATCH(01)12345678901234", 18 * 11 + 35),
+        ] {
+            let fields = parse(value).unwrap();
+            let geom = crate::encode_code128(&to_symbols(&fields)).unwrap();
+            assert_eq!(geom.total_modules, modules, "{}", value);
+        }
     }
 
     #[test]

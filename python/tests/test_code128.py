@@ -12,7 +12,8 @@ def test_code128_geometry_immutable():
     bc = Code128([Data("HELLO")])
     geom = bc.geometry()
     assert len(geom.bars) > 0
-    # Code128 with auto Code B start: Start B (11) + 5 chars (11 each) + checksum (11) + stop (13) = 90 modules
+    # All-alphabetic, so Code B is already minimal:
+    # Start B (11) + 5 chars (11 each) + checksum (11) + stop (13) = 90 modules
     assert geom.total_modules == 90
 
 
@@ -21,6 +22,27 @@ def test_code128_gs1():
     svg = bc.render_svg()
     assert "<svg" in svg
     assert "viewBox" in svg
+    # FNC1 + 16 digits packs into Code C: 9 symbols, not 17.
+    assert bc.geometry().total_modules == 9 * 11 + 35
+
+
+def test_code128_packs_digits_into_code_c():
+    # 20 digits are 10 Code C symbols, not 20 Code B ones. Callers size a
+    # barcode from its module count, so getting this wrong draws it too dense.
+    bc = Code128([Data("12345678901234567890")])
+    assert bc.geometry().total_modules == 10 * 11 + 35
+
+
+def test_code128_plans_across_data_symbols():
+    # A digit run split across Data entries still packs as one run.
+    split = Code128([Data("0112345678901234"), Data("17260101")])
+    whole = Code128([Data("011234567890123417260101")])
+    assert split.geometry().total_modules == whole.geometry().total_modules
+
+
+def test_code128_rejects_non_ascii():
+    with pytest.raises(RubarError):
+        Code128([Data("caf\u00e9")])
 
 
 def test_code128_with_quiet_zone():
@@ -45,6 +67,13 @@ def test_code128_explicit_start_c():
     bc = Code128([StartC(), Data("123456")])
     geom = bc.geometry()
     assert geom.total_modules > 0
+
+
+def test_code128_start_symbol_pins_initial_code_set():
+    # StartA costs one latch here; unpinned, the planner starts in Code C.
+    assert Code128([Data("123456")]).geometry().total_modules == 3 * 11 + 35
+    pinned = Code128([StartA(), Data("123456")])
+    assert pinned.geometry().total_modules == 4 * 11 + 35
 
 
 def test_render_png_pixels():
